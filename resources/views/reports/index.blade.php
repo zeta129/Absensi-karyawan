@@ -1,11 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Attendance Reports') }}
+            <h2 class="font-semibold text-2xl text-white leading-tight">
+                📊 {{ __('Attendance Reports') }}
             </h2>
-            <a href="{{ route('reports.export', ['month_year' => $monthYear]) }}" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                Export CSV
+            <a href="{{ route('reports.export', ['month_year' => $monthYear]) }}" class="btn-success">
+                📥 Export CSV
             </a>
         </div>
     </x-slot>

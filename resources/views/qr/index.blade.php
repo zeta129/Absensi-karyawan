@@ -1,11 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('QR Code Management') }}
+            <h2 class="font-semibold text-2xl text-white leading-tight">
+                📱 {{ __('QR Code Management') }}
             </h2>
-            <button onclick="showGenerateModal()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Generate QR Code
+            <button onclick="showGenerateModal()" class="btn-primary">
+                ✨ Generate QR Code
             </button>
         </div>
     </x-slot>
