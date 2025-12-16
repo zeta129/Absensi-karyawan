@@ -30,6 +30,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/qr-codes/{qrCode}/deactivate', [QrCodeController::class, 'deactivate'])->name('qr.deactivate');
     });
 
+    // Face recognition verification endpoint (calls external service)
+    Route::post('/attendance/face-verify', [\App\Http\Controllers\AttendanceController::class, 'faceVerify'])
+        ->name('attendance.face_verify');
+
+    // Face enrollment endpoint (store reference face)
+    Route::post('/attendance/face-enroll', [\App\Http\Controllers\AttendanceController::class, 'faceEnroll'])
+        ->name('attendance.face_enroll');
+
     // Attendance routes
     Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
     Route::post('/attendance/scan', [AttendanceController::class, 'scan'])->name('attendance.scan');
@@ -48,6 +56,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
         Route::get('/reports/user/{user}', [ReportController::class, 'userDetail'])->name('reports.user-detail');
         Route::get('/reports/activity-log', [ReportController::class, 'activityLog'])->name('reports.activity-log');
+    });
+
+    // Admin employee management
+    Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::resource('employees', \App\Http\Controllers\Admin\EmployeeController::class)->parameters(['employees' => 'employee']);
     });
 });
 

@@ -22,6 +22,12 @@
                         </x-nav-link>
                     @endif
 
+                    @if(Auth::user()->isAdmin())
+                        <x-nav-link :href="route('admin.employees.index')" :active="request()->routeIs('admin.employees.*')">
+                            {{ __('Employee Management') }}
+                        </x-nav-link>
+                    @endif
+
                     <x-nav-link :href="route('attendance.index')" :active="request()->routeIs('attendance.*')">
                         {{ __('Attendance') }}
                     </x-nav-link>

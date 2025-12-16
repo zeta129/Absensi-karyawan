@@ -44,6 +44,18 @@
                                     <video id="employee-camera" width="100%" height="400" class="rounded bg-black"></video>
                                 </div>
                                 <p id="employee-scan-status" class="text-sm text-gray-600 text-center">Arahkan kamera ke QR code...</p>
+                                <div class="flex justify-center mt-2">
+                                    <button type="button" id="employee-face-verify-btn" onclick="captureEmployeeFace()" 
+                                            class="px-4 py-2 bg-indigo-600 text-white rounded font-semibold">
+                                        👤 Verify Face
+                                    </button>
+                                </div>
+                                <div class="flex justify-center mt-2">
+                                    <button type="button" id="employee-face-enroll-btn" onclick="captureEmployeeEnroll()" 
+                                            class="px-4 py-2 bg-amber-600 text-white rounded font-semibold ms-2">
+                                        🆔 Enroll Face
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Manual Input -->
@@ -389,5 +401,114 @@ window.addEventListener('beforeunload', function() {
     stopEmployeeCamera();
     stopAdminCamera();
 });
+
+// CSRF token for AJAX POSTs
+const CSRF_TOKEN = '{{ csrf_token() }}';
+
+async function captureEmployeeFace() {
+    const video = document.getElementById('employee-camera');
+    const status = document.getElementById('employee-scan-status');
+    if (!video || video.readyState === 0) {
+        status.textContent = '❌ Camera belum aktif atau tidak tersedia.';
+        return;
+    }
+    try {
+        // Wait until video meta is available and has width/height
+        const ready = await waitForVideoReady(video, 3000);
+        if (!ready) {
+            status.textContent = '❌ Camera belum siap (timeout). Coba lagi.';
+            return;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Get base64 image
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+        status.textContent = '🔎 Memverifikasi wajah...';
+
+        const form = new FormData();
+        form.append('_token', CSRF_TOKEN);
+        form.append('image_base64', dataUrl);
+        form.append('type', document.getElementById('scan-type').value || 'checkin');
+
+        const resp = await fetch('{{ route('attendance.face_verify') }}', {
+            method: 'POST',
+            body: form
+        });
+
+        if (resp.redirected) {
+            window.location = resp.url;
+            return;
+        }
+
+        window.location.reload();
+    } catch (err) {
+        console.error(err);
+        status.textContent = '❌ Gagal saat verifikasi wajah: ' + err.message;
+    }
+}
+
+async function captureEmployeeEnroll() {
+    const video = document.getElementById('employee-camera');
+    const status = document.getElementById('employee-scan-status');
+    if (!video || video.readyState === 0) {
+        status.textContent = '❌ Camera belum aktif atau tidak tersedia.';
+        return;
+    }
+    try {
+        const ready = await waitForVideoReady(video, 3000);
+        if (!ready) {
+            status.textContent = '❌ Camera belum siap (timeout). Coba lagi.';
+            return;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Get base64 image
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+        status.textContent = '🔁 Mengirim foto untuk pendaftaran...';
+
+        const form = new FormData();
+        form.append('_token', CSRF_TOKEN);
+        form.append('image_base64', dataUrl);
+
+        const resp = await fetch('{{ route('attendance.face_enroll') }}', {
+            method: 'POST',
+            body: form
+        });
+
+        if (resp.redirected) {
+            window.location = resp.url;
+            return;
+        }
+
+        window.location.reload();
+    } catch (err) {
+        console.error(err);
+        status.textContent = '❌ Gagal saat pendaftaran wajah: ' + err.message;
+    }
+}
+
+function waitForVideoReady(video, timeoutMs = 2000) {
+    return new Promise(resolve => {
+        const start = Date.now();
+        function check() {
+            if (video.videoWidth && video.videoHeight) return resolve(true);
+            if (Date.now() - start > timeoutMs) return resolve(false);
+            requestAnimationFrame(check);
+        }
+        check();
+    });
+}
 </script>
 </x-app-layout>

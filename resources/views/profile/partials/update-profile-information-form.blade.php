@@ -5,9 +5,20 @@
         </h2>
 
         <p class="mt-2 text-sm text-gray-600">
-            {{ __("Update your account's profile information and email address.") }}
+            @if(Auth::user()->isAdmin())
+                {{ __("Update your account's profile information and email address.") }}
+            @else
+                {{ __("View your profile information. Admins can edit profiles in Employee Management.") }}
+            @endif
         </p>
     </header>
+
+    @if(!Auth::user()->isAdmin())
+    <div class="mt-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-700 rounded">
+        <p class="font-semibold">📌 View Only</p>
+        <p class="text-sm mt-1">Your profile can only be edited by administrators. To request changes, please contact your admin.</p>
+    </div>
+    @endif
 
     <form id="send-verification" method="post" action="{{ route('verification.send') }}">
         @csrf
@@ -19,13 +30,13 @@
 
         <div>
             <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="input-modern mt-2 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
+            <x-text-input id="name" name="name" type="text" class="input-modern mt-2 block w-full" :value="old('name', $user->name)" {{ !Auth::user()->isAdmin() ? 'disabled' : '' }} required autofocus autocomplete="name" />
             <x-input-error class="mt-2" :messages="$errors->get('name')" />
         </div>
 
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="input-modern mt-2 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
+            <x-text-input id="email" name="email" type="email" class="input-modern mt-2 block w-full" :value="old('email', $user->email)" {{ !Auth::user()->isAdmin() ? 'disabled' : '' }} required autocomplete="username" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
@@ -47,6 +58,7 @@
             @endif
         </div>
 
+        @if(Auth::user()->isAdmin())
         <div class="flex items-center gap-4">
             <x-primary-button class="btn-primary">{{ __('Save Changes') }}</x-primary-button>
 
@@ -60,5 +72,6 @@
                 >✅ {{ __('Saved.') }}</p>
             @endif
         </div>
+        @endif
     </form>
 </section>

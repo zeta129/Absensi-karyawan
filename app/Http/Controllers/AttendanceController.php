@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 
 class AttendanceController extends Controller
 {
@@ -266,5 +267,163 @@ class AttendanceController extends Controller
 
             return redirect()->back()->with('success', 'Check-out untuk ' . $employee->name . ' berhasil dicatat');
         }
+    }
+
+    /**
+     * Face recognition verification endpoint.
+     * Accepts a base64 image, forwards to the FastAPI service, and records attendance
+     */
+    public function faceVerify(Request $request)
+    {
+        $validated = $request->validate([
+            'image_base64' => 'required|string',
+            'type' => 'required|in:checkin,checkout'
+        ]);
+
+        // Call local FastAPI face recognition service
+        try {
+            $resp = Http::timeout(10)->post(config('app.face_recognition_service','http://127.0.0.1:8001').'/recognize', [
+                'image_base64' => $validated['image_base64']
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Face recognition service error: '.$e->getMessage());
+        }
+
+        if (!$resp->ok()) {
+            return redirect()->back()->with('error', 'Face recognition service returned an error');
+        }
+
+        $data = $resp->json();
+
+        if (empty($data) || !isset($data['matched'])) {
+            return redirect()->back()->with('error', 'Invalid response from face recognition service');
+        }
+
+        if (!$data['matched']) {
+            return redirect()->back()->with('error', 'Wajah tidak terdeteksi atau tidak cocok');
+        }
+
+        $matchedUserId = $data['user_id'] ?? null;
+        if (!$matchedUserId) {
+            return redirect()->back()->with('error', 'Tidak ada user yang cocok');
+        }
+
+        // Try to find the user
+        $user = \App\Models\User::find($matchedUserId);
+        if (!$user) {
+            return redirect()->back()->with('error', 'User dikenali tidak ditemukan dalam sistem');
+        }
+
+        $type = $validated['type'];
+        $today = Carbon::today();
+
+        // If the current authenticated user is an employee, ensure they match themselves
+        if (auth()->user()->isEmployee() && auth()->id() != $user->id) {
+            return redirect()->back()->with('error', 'Wajah yang dikenali tidak sesuai dengan akun Anda');
+        }
+
+        $attendance = Attendance::where('user_id', $user->id)
+            ->where('attendance_date', $today)
+            ->first();
+
+        if ($type === 'checkin') {
+            if ($attendance && $attendance->check_in) {
+                return redirect()->back()->with('info', 'Sudah melakukan check-in hari ini');
+            }
+
+            if (!$attendance) {
+                $attendance = Attendance::create([
+                    'user_id' => $user->id,
+                    'qr_code_id' => null,
+                    'attendance_date' => $today,
+                    'check_in' => Carbon::now()->format('H:i:s'),
+                    'status' => 'present'
+                ]);
+            } else {
+                $attendance->update(['check_in' => Carbon::now()->format('H:i:s')]);
+            }
+
+            ActivityLog::log(
+                auth()->id(),
+                'face_recog_checkin',
+                'Checked in via face recognition for user '.$user->id,
+                'Attendance',
+                $attendance->id
+            );
+
+            return redirect()->back()->with('success', 'Check-in berhasil dicatat (Face recognized)');
+        } else {
+            if (!$attendance) {
+                return redirect()->back()->with('error', 'Belum ada check-in hari ini.');
+            }
+            if ($attendance->check_out) {
+                return redirect()->back()->with('info', 'Sudah melakukan check-out hari ini');
+            }
+
+            $attendance->update(['check_out' => Carbon::now()->format('H:i:s')]);
+
+            ActivityLog::log(
+                auth()->id(),
+                'face_recog_checkout',
+                'Checked out via face recognition for user '.$user->id,
+                'Attendance',
+                $attendance->id
+            );
+
+            return redirect()->back()->with('success', 'Check-out berhasil dicatat (Face recognized)');
+        }
+    }
+
+    /**
+     * Enroll a reference face for a user by sending image to recognition service.
+     * Admins/managers can enroll for any user by providing `user_id` in the request.
+     */
+    public function faceEnroll(Request $request)
+    {
+        $validated = $request->validate([
+            'image_base64' => 'required|string',
+            'user_id' => 'nullable|exists:users,id'
+        ]);
+
+        // determine target user id
+        $targetUserId = null;
+        if (!empty($validated['user_id'])) {
+            // only allow admin/manager to enroll other users
+            if (!auth()->user()->isAdmin() && !auth()->user()->isManager()) {
+                return redirect()->back()->with('error', 'Unauthorized to enroll other users');
+            }
+            $targetUserId = $validated['user_id'];
+        } else {
+            $targetUserId = auth()->id();
+        }
+
+        try {
+            $resp = Http::timeout(10)->post(config('app.face_recognition_service','http://127.0.0.1:8001').'/enroll', [
+                'image_base64' => $validated['image_base64'],
+                'user_id' => (string)$targetUserId
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Face recognition service error: '.$e->getMessage());
+        }
+
+        if (!$resp->ok()) {
+            return redirect()->back()->with('error', 'Face recognition service returned an error');
+        }
+
+        $data = $resp->json();
+
+        if (!empty($data['enrolled']) && $data['enrolled'] === true) {
+            ActivityLog::log(
+                auth()->id(),
+                'face_enroll',
+                'Enrolled face for user '.$targetUserId,
+                'Attendance',
+                null
+            );
+
+            return redirect()->back()->with('success', 'Face enrollment berhasil untuk user ID '.$targetUserId);
+        }
+
+        return redirect()->back()->with('error', 'Enrollment failed: '.($data['reason'] ?? 'unknown'));
     }
 }

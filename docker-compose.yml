@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  face-recognition:
+    build:
+      context: ./face_recognition_service
+      dockerfile: Dockerfile
+    image: absensi-face-recognition:latest
+    restart: unless-stopped
+    volumes:
+      - ./face_recognition_service/faces:/app/faces
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1

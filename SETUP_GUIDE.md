@@ -374,7 +374,7 @@ $attendances = Attendance::whereYear('attendance_date', 2025)
 
 | Email | Password | Role |
 |-------|----------|------|
-| admin@absensi.local | password123 | Admin |
+| z | password123 | Admin |
 | manager@absensi.local | password123 | Manager |
 | employee1@absensi.local | password123 | Employee |
 | employee2@absensi.local | password123 | Employee |
